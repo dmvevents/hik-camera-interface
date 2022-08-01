@@ -33,12 +33,22 @@ bool HKIPCamCapture::open() {
 }
 
 bool HKIPCamCapture::read(cv::Mat &image) {
-  if (!isOpened())
+  if (!isOpened()){
+//      std::cout << "BAD READ" << std::endl;
+
     return false;
+  }
+//  std::cout << "TRYING READ" << std::endl;
   image = _hkipc->getframe();
+//  std::cout << "GOOD READ" << std::endl;
+
   return true;
 }
 
+cv::Mat HKIPCamCapture::getMat() {
+  cv::Mat image = _hkipc->getframe().clone();
+  return image;
+}
 HKIPCamCapture &HKIPCamCapture::operator>>(cv::Mat &image) {
   if (isOpened()) {
     read(image);

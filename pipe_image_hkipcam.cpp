@@ -1,5 +1,5 @@
-#include "pipeline/pipe_image_hkipcam.h"
-#include "HKIPcamera/HKIPCamCapture.h"
+//#include "pipeline/pipe_image_hkipcam.h"
+#include "HKIPCamCapture.h"
 #include <chrono>
 #include <iostream>
 #include <thread>

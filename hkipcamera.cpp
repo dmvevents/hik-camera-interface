@@ -20,7 +20,7 @@
 
 
 #define USECOLOR 1
-#define WINAPI
+//#define WINAPI
 
 using namespace cv;
 using namespace std;
@@ -63,8 +63,6 @@ void yv12toRGBMat(char *inYv12, int width, int height, cv::Mat &outMat,
     cv::cvtColor(yuvImg, outMat, cv::COLOR_YUV2BGR_YV12);
   } else {
     outMat = cv::Mat(height, width, CV_8UC3);
-//    decodeH264((unsigned char *)(void *)(inYv12), outMat.data, width, height,
-//               device_id);
   }
 }
 
@@ -106,8 +104,9 @@ cv::Mat Yv12ToRGB(uchar *pBuffer, int width, int height)
     return result;
 }
 
-void CALLBACK DecCBFun(int nPort, char *pBuf, int nSize, FRAME_INFO *pFrameInfo,
-                       void *pUser, int nReserved2) {
+void CALLBACK DecCBFun(int nPort, char *pBuf, int nSize, FRAME_INFO *pFrameInfo, void *pUser, int nReserved2) {
+//  cout << "HERE 1" << std::endl;
+
   long lFrameType = pFrameInfo->nType;
   HKIPcamera *hkipc = static_cast<HKIPcamera *>(pUser);
   bool buffer_full = false;
@@ -123,29 +122,48 @@ void CALLBACK DecCBFun(int nPort, char *pBuf, int nSize, FRAME_INFO *pFrameInfo,
   if (lFrameType == T_YV12) {
 #if USECOLOR
       //int start = clock();
-      static IplImage* pImgYCrCb = cvCreateImage(cvSize(pFrameInfo->nWidth, pFrameInfo->nHeight), 8, 3);//get the Y component of the image
-      yv12toYUV(pImgYCrCb->imageData, pBuf, pFrameInfo->nWidth, pFrameInfo->nHeight, pImgYCrCb->widthStep);//get all RGB images
+//      static IplImage* pImgYCrCb = cvCreateImage(cvSize(pFrameInfo->nWidth, pFrameInfo->nHeight), 8, 3);//get the Y component of the image
+//      yv12toYUV(pImgYCrCb->imageData, pBuf, pFrameInfo->nWidth, pFrameInfo->nHeight, pImgYCrCb->widthStep);//get all RGB images
 
-      static IplImage* pImg = cvCreateImage(cvSize(pFrameInfo->nWidth, pFrameInfo->nHeight), 8, 3);
-      cvCvtColor(pImgYCrCb, pImg, CV_YCrCb2RGB);
+//      static IplImage* pImg = cvCreateImage(cvSize(pFrameInfo->nWidth, pFrameInfo->nHeight), 8, 3);
+//      cvCvtColor(pImgYCrCb, pImg, CV_YCrCb2RGB);
+//      Mat rgbMat;
+//      rgbMat.create(pFrameInfo->nHeight, pFrameInfo->nWidth, CV_8UC3);
+//      //memcpy(rgbMat.data, pImg, pFrameInfo->nWidth * pFrameInfo->nHeight*3);
+
+      Mat rgbMat;
+      rgbMat.create(pFrameInfo->nHeight, pFrameInfo->nWidth, CV_8UC1);
+      int yuvHeight = pFrameInfo->nHeight * 3 / 2;
+      int bufLen = pFrameInfo->nWidth * yuvHeight;
+      cv::Mat yuvImg;
+      yuvImg.create(yuvHeight, pFrameInfo->nWidth, CV_8UC1);
+      memcpy(yuvImg.data, pBuf, bufLen * sizeof(unsigned char));
+      cv::cvtColor(yuvImg, rgbMat, cv::COLOR_YUV2BGR_YV12);
+      pthread_mutex_lock(&(hkipc->frame_list_mutex_));
+
+      if (!hkipc->is_buffer_full()) {
+//         rgbMat = cvarrToMat(pImg, true);
+        hkipc->push_frame(rgbMat);
+      }
+
 #else
     Mat rgbMat;
     rgbMat.create(pFrameInfo->nHeight, pFrameInfo->nWidth, CV_8UC1);
     memcpy(rgbMat.data, pBuf, pFrameInfo->nWidth * pFrameInfo->nHeight);
-#endif
     pthread_mutex_lock(&(hkipc->frame_list_mutex_));
     if (!hkipc->is_buffer_full()) {
-       Mat rgbMat = cvarrToMat(pImg);
-      hkipc->push_frame(rgbMat);
+
+        hkipc->push_frame(rgbMat);
     }
+#endif
+
     // cvReleaseImage(&pImg);
     pthread_mutex_unlock(&(hkipc->frame_list_mutex_));
   }
 }
 
 /// real time stream
-void CALLBACK fRealDataCallBack(LONG lRealHandle, DWORD dwDataType,
-                                BYTE *pBuffer, DWORD dwBufSize, void *pUser) {
+void CALLBACK fRealDataCallBack(LONG lRealHandle, DWORD dwDataType, BYTE *pBuffer, DWORD dwBufSize, void *pUser) {
   DWORD dRet;
   HKIPcamera *hkipc = static_cast<HKIPcamera *>(pUser);
   int &nPort = hkipc->nPort_;
@@ -156,7 +174,7 @@ void CALLBACK fRealDataCallBack(LONG lRealHandle, DWORD dwDataType,
     }
     if (dwBufSize > 0) {
 
-      if (!PlayM4_OpenStream(nPort, pBuffer, dwBufSize, 1024 * 1024)) {
+      if (!PlayM4_OpenStream(nPort, pBuffer, dwBufSize, 1024 * 1024*64)) {
         dRet = PlayM4_GetLastError(nPort);
         break;
       }
@@ -187,8 +205,7 @@ void CALLBACK fRealDataCallBack(LONG lRealHandle, DWORD dwDataType,
   }
 }
 
-void CALLBACK g_ExceptionCallBack(DWORD dwType, LONG user_id_, LONG lHandle,
-                                  void *pUser) {
+void CALLBACK g_ExceptionCallBack(DWORD dwType, LONG user_id_, LONG lHandle, void *pUser) {
   char tempbuf[256] = {0};
   switch (dwType) {
   case EXCEPTION_RECONNECT:
@@ -256,7 +273,7 @@ void *ReadCamera(void *inParam) {
            NET_DVR_GetLastError());
     // return -1;
   } else {
-    cout << "success！" << endl;
+    cout << "Read success！" << endl;
   }
   // return 0;
 }
@@ -276,6 +293,7 @@ HKIPcamera::~HKIPcamera() { release(); }
 bool HKIPcamera::init(char *ip, char *usr, char *password, long port,
                       long channel, long streamtype, long link_mode,
                       int device_id, long buffer_size) {
+
   pthread_t hThread;
    cout << "IP:" << ip << "    UserName:" << usr << "    PassWord:" <<
    password << endl;
@@ -300,16 +318,19 @@ bool HKIPcamera::init(char *ip, char *usr, char *password, long port,
 
 Mat HKIPcamera::getframe() {
   Mat frame1;
+
   pthread_mutex_lock(&frame_list_mutex_);
+
   while (!frame_list_.size()) {
     pthread_mutex_unlock(&frame_list_mutex_);
     pthread_mutex_lock(&frame_list_mutex_);
   }
+
   list<Mat>::iterator it;
   it = frame_list_.end();
   it--;
   Mat dbgframe = (*(it));
-  // (*frame_list_.begin()).copyTo(frame1);
+   (*frame_list_.begin()).copyTo(frame1);
   frame1 = dbgframe;
   frame_list_.pop_front();
 

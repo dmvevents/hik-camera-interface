@@ -3,6 +3,7 @@
 #include "LinuxPlayM4.h"
 #include <list>
 #include <opencv2/opencv.hpp>
+#include <mutex>
 
 class HKIPcamera {
 public:
@@ -29,6 +30,8 @@ public:
   long buffersize_;
   long linkmode_;
   long device_id_;
+  std::mutex m;
+
 
 private:
   bool OpenCamera(char *ip, long port, char *usr, char *password);

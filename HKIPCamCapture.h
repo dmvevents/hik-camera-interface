@@ -34,6 +34,7 @@ public:
   HKIPCamCapture &operator>>(cv::Mat &image);
   void release();
 
+  cv::Mat getMat();
 private:
   SIPCam_Connect_Param _conn_param;
   HKIPcamera *_hkipc;
