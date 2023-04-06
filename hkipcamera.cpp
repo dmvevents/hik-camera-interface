@@ -12,7 +12,7 @@
 #include <pthread.h>
 #include <time.h>
 #include <unistd.h>
-
+#include <thread>
 
 #include "opencv2/core/core_c.h"
 #include "opencv2/videoio/legacy/constants_c.h"
@@ -28,6 +28,11 @@ using namespace std;
 //extern "C" void decodeH264(const unsigned char *input, unsigned char *output,
 //                           int width, int height, int device_id);
 //--------------------------------------------
+
+inline void delay(int s)
+{
+    this_thread::sleep_for(chrono::milliseconds(s));
+}
 
 void yv12toYUV(char *outYuv, char *inYv12, int width, int height,
                int widthStep) {
@@ -156,6 +161,7 @@ void CALLBACK DecCBFun(int nPort, char *pBuf, int nSize, FRAME_INFO *pFrameInfo,
         hkipc->push_frame(rgbMat);
     }
 #endif
+    //delay(20);
 
     // cvReleaseImage(&pImg);
     pthread_mutex_unlock(&(hkipc->frame_list_mutex_));
@@ -164,6 +170,8 @@ void CALLBACK DecCBFun(int nPort, char *pBuf, int nSize, FRAME_INFO *pFrameInfo,
 
 /// real time stream
 void CALLBACK fRealDataCallBack(LONG lRealHandle, DWORD dwDataType, BYTE *pBuffer, DWORD dwBufSize, void *pUser) {
+//    cout << "HERE 2" << std::endl;
+
   DWORD dRet;
   HKIPcamera *hkipc = static_cast<HKIPcamera *>(pUser);
   int &nPort = hkipc->nPort_;
@@ -174,7 +182,8 @@ void CALLBACK fRealDataCallBack(LONG lRealHandle, DWORD dwDataType, BYTE *pBuffe
     }
     if (dwBufSize > 0) {
 
-      if (!PlayM4_OpenStream(nPort, pBuffer, dwBufSize, 1024 * 1024*64)) {
+      if (!PlayM4_OpenStream(nPort, pBuffer, dwBufSize, 1024 * 1024*8*2)) {
+//        if (!PlayM4_OpenStream(nPort, pBuffer, dwBufSize, 1280 * 720)) {
         dRet = PlayM4_GetLastError(nPort);
         break;
       }
@@ -196,7 +205,6 @@ void CALLBACK fRealDataCallBack(LONG lRealHandle, DWORD dwDataType, BYTE *pBuffe
     if (dwBufSize > 0 && nPort != -1) {
       BOOL inData = PlayM4_InputData(nPort, pBuffer, dwBufSize);
       while (!inData) {
-        sleep(10);
         inData = PlayM4_InputData(nPort, pBuffer, dwBufSize);
         cout << (L"PlayM4_InputData failed \n") << endl;
       }
@@ -244,7 +252,7 @@ void *ReadCamera(void *inParam) {
   NET_DVR_PREVIEWINFO previewInfo = {0};
   previewInfo.hPlayWnd = NULL;
   previewInfo.lChannel = long(struDeviceInfo.byStartDChan) + channel;
-//  previewInfo.dwStreamType = streamtype;
+  previewInfo.dwStreamType = streamtype;
   previewInfo.dwLinkMode = linkmode;
 
 //  long realhandle;
@@ -294,16 +302,18 @@ bool HKIPcamera::init(char *ip, char *usr, char *password, long port,
                       long channel, long streamtype, long link_mode,
                       int device_id, long buffer_size) {
 
-  pthread_t hThread;
+  //pthread_t hThread;
    cout << "IP:" << ip << "    UserName:" << usr << "    PassWord:" <<
    password << endl;
   NET_DVR_Init();
   NET_DVR_SetConnectTime(2000, 1);
   NET_DVR_SetReconnect(10000, true);
   bool login_success = OpenCamera(ip, port, usr, password);
+
   if (!login_success) {
     return login_success;
   }
+
   channel_ = channel;
   streamtype_ = streamtype;
   buffersize_ = buffer_size;
@@ -312,7 +322,9 @@ bool HKIPcamera::init(char *ip, char *usr, char *password, long port,
   pthread_mutex_init(&frame_list_mutex_, NULL);
 //   hThread = ::CreateThread(NULL, 0, ReadCamera, NULL, 0, 0);
   ReadCamera(this);
-   pthread_create(&hThread, NULL, ReadCamera, this);
+//  cout << "HERE 3" << std::endl;
+
+   //pthread_create(&hThread, NULL, ReadCamera, this);
   return true;
 }
 

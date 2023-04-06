@@ -1,4 +1,4 @@
-#pragma once
+//#pragma once
 #include "HCNetSDK.h"
 #include "LinuxPlayM4.h"
 #include <list>

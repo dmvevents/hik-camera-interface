@@ -15,6 +15,7 @@ HKIPCamCapture::~HKIPCamCapture() {
 }
 
 bool HKIPCamCapture::open() {
+
   if (isOpened()) {
     release();
   }
@@ -25,28 +26,27 @@ bool HKIPCamCapture::open() {
   strcpy(ip_str, _conn_param.ip.c_str());
   strcpy(username_str, _conn_param.username.c_str());
   strcpy(password_str, _conn_param.password.c_str());
+
   _is_opened = _hkipc->init(ip_str, username_str, password_str,
                             _conn_param.port, _conn_param.channel,
                             _conn_param.streamtype, _conn_param.link_mode,
                             _conn_param.device_id, _conn_param.buffer_size);
-  return isOpened();
+  return true;
+
 }
 
 bool HKIPCamCapture::read(cv::Mat &image) {
   if (!isOpened()){
-//      std::cout << "BAD READ" << std::endl;
 
     return false;
   }
-//  std::cout << "TRYING READ" << std::endl;
   image = _hkipc->getframe();
-//  std::cout << "GOOD READ" << std::endl;
 
   return true;
 }
 
 cv::Mat HKIPCamCapture::getMat() {
-  cv::Mat image = _hkipc->getframe().clone();
+  cv::Mat image = _hkipc->getframe();
   return image;
 }
 HKIPCamCapture &HKIPCamCapture::operator>>(cv::Mat &image) {
@@ -57,6 +57,7 @@ HKIPCamCapture &HKIPCamCapture::operator>>(cv::Mat &image) {
 }
 
 void HKIPCamCapture::release() {
+
   if (!_hkipc || !isOpened()) {
     return;
   }
